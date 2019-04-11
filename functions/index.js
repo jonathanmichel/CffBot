@@ -57,8 +57,42 @@ exports.dialogflowFirebaseFulfillment = functions.https.onRequest((request, resp
 		})
 	}
 
+	function leaveA(agent) {
+		var param = request.body.queryResult.parameters;
+
+		const req = require('request-promise-native');
+		var options = {
+			uri: 'http://transport.opendata.ch/v1/stationboard?station=' + param.depart + '&limit=5',
+			family: 4
+		};
+		
+		agent.add("Trajet quittant " + param.depart)
+		return req(options).then(function (parsedBody) {
+			const data = JSON.parse(parsedBody)
+			console.log(data)
+			//agent.add("Trajet de " + data.from.name + " à " + data.to.name + " : " + Object.keys(data.connections).length + " résultat(s)")
+			agent.add(Object.keys(data.stationboard).length + " résultat(s) trouvé(s)")
+			//
+			for(var attr in data.stationboard){
+				var rep = "";
+				var con = data.stationboard[attr]
+				var stop = con.stop
+				rep += ((Number(attr)+1) + ". " + con.category + " " + con.number  + " vers " + con.to)
+				rep += ("\tDépart à " + stop.departure + (stop.platform ? " sur le quai " + stop.platform : ""))		// platform unavailable with bus
+				agent.add(rep);
+			}
+			//*/			
+			return Promise.resolve(agent); 
+		}).catch(function (err) {
+			console.log(err)
+			agent.add("Server error :(")
+			return Promise.resolve(agent); 
+		})
+	}
+
 	// Run the proper function handler based on the matched Dialogflow intent name
 	let intentMap = new Map();
 	intentMap.set('AllerDeAaB', goFromAToB);
+	intentMap.set('PartirDeA', leaveA);
 	agent.handleRequest(intentMap);
 });
